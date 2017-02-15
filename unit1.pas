@@ -10,6 +10,11 @@ uses
 
 const
   PANEL_WIDTH = 220;
+  THUMB_WIDTH = 113;
+  THUMB_HEIGHT = 55;
+  THUMB_COMPNAME = 'thumb';
+
+  PW_CLIENTONLY = $00000001;
   INTERNET_MAX_PATH_LENGTH = 2048;
   INTERNET_MAX_SCHEME_LENGTH = 32;         // longest protocol name length
   INTERNET_MAX_URL_LENGTH =
@@ -147,8 +152,11 @@ type
     WndClass: TWndClass;
     VideoPtr: libvlc_media_player_t_ptr;
     MediaPtr: libvlc_media_t_ptr;
+    EvtMgr: libvlc_event_manager_t_ptr;
+    CurrentVid: string;
     VideoPathComponent: TWinControl;
   end;
+  PVideoWallpaper = ^TVideoWallpaper;
 
   { TForm1 }
   TForm1 = class(TForm)
@@ -168,6 +176,7 @@ type
   private
     { private declarations }
     p_li: libvlc_instance_t_ptr;
+
     procedure Initialize();
     procedure PanelButtonSetClick(Sender: TObject);
     procedure PanelButtonClearClick(Sender: TObject);
@@ -185,12 +194,11 @@ type
   { TSnapshotThread }
 
   TSnapshotThread = class(TThread)
-  private
-    FPtr: libvlc_media_player_t_ptr;
   protected
+    VideoWall: TVideoWallpaper;
     procedure Execute; override;
   public
-    constructor Create(APtr: libvlc_media_player_t_ptr);
+    constructor Create(const Wall: TVideoWallpaper);
   end;
 
 var
@@ -217,22 +225,49 @@ begin
   Result := DefWindowProc(_para1, _para2, _para3, _para4);
 end;
 
+function GetScreenshotFileName(const VidFile: string): string;
+begin
+  Result := IncludeTrailingBackslash(ExtractFilePath(Application.ExeName)) +
+    ChangeFileExt(ExtractFileName(VidFile), '.png');
+end;
+
+procedure SnapshotTaken(p_event: libvlc_event_t_ptr; Data: Pointer); cdecl;
+var
+  VideoWall: PVideoWallpaper;
+begin
+  VideoWall := Data;
+
+  libvlc_event_detach(VideoWall^.EvtMgr, libvlc_MediaPlayerSnapshotTaken,
+    @SnapshotTaken, nil);
+
+  ShowWindow(VideoWall^.WndHandle, SW_SHOW);
+  TImage(VideoWall^.VideoPathComponent.FindComponent(THUMB_COMPNAME)).Picture.
+    LoadFromFile(GetScreenshotFileName(VideoWall^.CurrentVid));
+end;
+
 { TSnapshotThread }
 
 procedure TSnapshotThread.Execute;
+var
+  ScreenshotPath: string;
 begin
-  Sleep(1000);
-  libvlc_video_take_snapshot(Self.FPtr, 0,
-    PAnsiChar(Utf8Encode('C:\Users\Patryk\Documents\Lazarus\drawer\test.png')),
-    800, 600);
+  while (libvlc_media_player_has_vout(VideoWall.VideoPtr) = 0) do ;
+
+  libvlc_event_attach(VideoWall.EvtMgr, libvlc_MediaPlayerSnapshotTaken,
+    @SnapshotTaken, @VideoWall);
+
+  ScreenshotPath := GetScreenshotFileName(VideoWall.CurrentVid);
+
+  libvlc_video_take_snapshot(VideoWall.VideoPtr, 0,
+    PAnsiChar(Utf8Encode(ScreenshotPath)), THUMB_WIDTH, THUMB_HEIGHT);
 end;
 
-constructor TSnapshotThread.Create(APtr: libvlc_media_player_t_ptr);
+constructor TSnapshotThread.Create(const Wall: TVideoWallpaper);
 begin
   inherited Create(False);
 
-  FreeOnTerminate := True;
-  Self.FPtr := APtr;
+  FreeOnTerminate := False;
+  Self.VideoWall := Wall;
 end;
 
 { TForm1 }
@@ -256,7 +291,8 @@ begin
 
   with TArgcArgs.Create([libvlc_dynamic_dll_path, '--intf=dummy',
       '--ignore-config', '--quiet', '--vout=direct3d', '--no-video-title-show',
-      '--no-video-on-top']) do
+      '--no-video-on-top', '--no-snapshot-preview', '--no-stats',
+      '--no-sub-autodetect-file', '--quiet', '--freetype-opacity=0']) do
   begin
     p_li := libvlc_new(ARGC, ARGS);
     Free();
@@ -298,6 +334,7 @@ begin
     Windows.UnRegisterClass(PChar(WndHandles[I].WndClassName), hInstance);
   end;
   SetLength(WndHandles, 0);
+  libvlc_release(p_li);
 
   hObj := CreateComObject(CLSID_ActiveDesktop);
   ADesktop := hObj as IActiveDesktop;
@@ -328,18 +365,13 @@ end;
 procedure TForm1.PanelButtonSetClick(Sender: TObject);
 var
   Btn: TButton;
-  I, TaskbarHeight: integer;
+  I, TaskbarHeight, W, H: integer;
   Pth: string;
-  i_width, i_height: longword;
 begin
   if (OpenDialog1.Execute()) then
   begin
     Btn := TButton(Sender);
     I := Btn.Tag;
-    i_width := 0;
-    i_height := 0;
-
-    Btn.Caption := OpenDialog1.FileName;
 
     if (WndHandles[I].WndHandle = 0) then
     begin
@@ -388,14 +420,19 @@ begin
         libvlc_media_player_new_from_media(WndHandles[I].MediaPtr);
       if (WndHandles[I].VideoPtr <> nil) then
       begin
+        WndHandles[I].CurrentVid := Pth;
+        WndHandles[I].EvtMgr :=
+          libvlc_media_player_event_manager(WndHandles[I].VideoPtr);
         libvlc_video_set_key_input(WndHandles[I].VideoPtr, 1);
         libvlc_video_set_mouse_input(WndHandles[I].VideoPtr, 1);
         libvlc_media_add_option(WndHandles[I].MediaPtr, 'input-repeat=-1');
         libvlc_media_player_set_display_window(WndHandles[I].VideoPtr,
           WndHandles[I].WndHandle);
 
+        ShowWindow(WndHandles[I].WndHandle, SW_HIDE);
         libvlc_media_player_play(WndHandles[I].VideoPtr);
-        TSnapshotThread.Create(WndHandles[I].VideoPtr);
+
+        TSnapshotThread.Create(WndHandles[I]);
         libvlc_media_release(WndHandles[I].MediaPtr);
       end;
     end;
@@ -415,6 +452,9 @@ begin
     libvlc_media_player_stop(WndHandles[I].VideoPtr);
     libvlc_media_player_release(WndHandles[I].VideoPtr);
     WndHandles[I].VideoPtr := nil;
+
+    TImage(WndHandles[I].VideoPathComponent.FindComponent(THUMB_COMPNAME)).
+      Picture.Clear();
   end;
 end;
 
@@ -445,7 +485,7 @@ end;
 function TForm1.CreatePanelForMonitor(const MonitorIdx: integer): TPanel;
 var
   Container: TPanel;
-  IconMonitor: TImage;
+  IconMonitor, IconThumb: TImage;
   MonitorName: TLabel;
   Bmp: TBitmap;
   ButtonSet, ButtonClear: TButton;
@@ -460,6 +500,14 @@ begin
   IconMonitor.Height := 96;
   IconMonitor.Left := 48;
   IconMonitor.Top := 24;
+
+  IconThumb := TImage.Create(Container);
+  IconThumb.Parent := Container;
+  IconThumb.Width := THUMB_WIDTH;
+  IconThumb.Height := THUMB_HEIGHT;
+  IconThumb.Left := 56;
+  IconThumb.Top := 32;
+  IconThumb.Name := THUMB_COMPNAME;
 
   Bmp := TBitmap.Create();
   try
