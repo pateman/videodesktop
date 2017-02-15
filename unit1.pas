@@ -182,6 +182,17 @@ type
     CurrentPanel: integer;
   end;
 
+  { TSnapshotThread }
+
+  TSnapshotThread = class(TThread)
+  private
+    FPtr: libvlc_media_player_t_ptr;
+  protected
+    procedure Execute; override;
+  public
+    constructor Create(APtr: libvlc_media_player_t_ptr);
+  end;
+
 var
   Form1: TForm1;
   WorkerW: HWND;
@@ -204,6 +215,24 @@ function MyWndProc(_para1: HWND; _para2: UINT; _para3: WPARAM;
   _para4: LPARAM): LRESULT; stdcall;
 begin
   Result := DefWindowProc(_para1, _para2, _para3, _para4);
+end;
+
+{ TSnapshotThread }
+
+procedure TSnapshotThread.Execute;
+begin
+  Sleep(1000);
+  libvlc_video_take_snapshot(Self.FPtr, 0,
+    PAnsiChar(Utf8Encode('C:\Users\Patryk\Documents\Lazarus\drawer\test.png')),
+    800, 600);
+end;
+
+constructor TSnapshotThread.Create(APtr: libvlc_media_player_t_ptr);
+begin
+  inherited Create(False);
+
+  FreeOnTerminate := True;
+  Self.FPtr := APtr;
 end;
 
 { TForm1 }
@@ -287,7 +316,8 @@ var
 begin
   for I := 0 to Length(WndHandles) - 1 do
   begin
-    WndHandles[I].VideoPathComponent := CreatePanelForMonitor(Screen.Monitors[I].MonitorNum);
+    WndHandles[I].VideoPathComponent :=
+      CreatePanelForMonitor(Screen.Monitors[I].MonitorNum);
     WndHandles[I].VideoPathComponent.Parent := ScrollBox1;
     WndHandles[I].VideoPathComponent.Left := I * WndHandles[I].VideoPathComponent.Width;
   end;
@@ -300,11 +330,14 @@ var
   Btn: TButton;
   I, TaskbarHeight: integer;
   Pth: string;
+  i_width, i_height: longword;
 begin
   if (OpenDialog1.Execute()) then
   begin
     Btn := TButton(Sender);
     I := Btn.Tag;
+    i_width := 0;
+    i_height := 0;
 
     Btn.Caption := OpenDialog1.FileName;
 
@@ -331,10 +364,10 @@ begin
         TaskbarHeight, Screen.Monitors[I].Width, Screen.Monitors[I].Height,
         0, 0, hInstance, nil);
 
-      //SetWindowLong(WndHandles[I].WndHandle, GWL_EXSTYLE,
-        //GetWindowLong(WndHandles[I].WndHandle, GWL_EXSTYLE) or WS_EX_LAYERED);
-      //SetLayeredWindowAttributes(WndHandles[I].WndHandle, RGB(255, 255, 255),
-				//0, LWA_COLORKEY);
+      SetWindowLong(WndHandles[I].WndHandle, GWL_EXSTYLE,
+        GetWindowLong(WndHandles[I].WndHandle, GWL_EXSTYLE) or WS_EX_LAYERED);
+      SetLayeredWindowAttributes(WndHandles[I].WndHandle, RGB(255, 255, 255),
+        0, LWA_COLORKEY);
 
       Windows.SetParent(WndHandles[I].WndHandle, WorkerW);
     end;
@@ -362,6 +395,7 @@ begin
           WndHandles[I].WndHandle);
 
         libvlc_media_player_play(WndHandles[I].VideoPtr);
+        TSnapshotThread.Create(WndHandles[I].VideoPtr);
         libvlc_media_release(WndHandles[I].MediaPtr);
       end;
     end;
@@ -371,7 +405,7 @@ end;
 procedure TForm1.PanelButtonClearClick(Sender: TObject);
 var
   Btn: TButton;
-  I: Integer;
+  I: integer;
 begin
   Btn := TButton(Sender);
   I := Btn.Tag;
@@ -442,7 +476,8 @@ begin
   MonitorName.Width := Container.Width;
   MonitorName.Alignment := taCenter;
   MonitorName.Font.Style := [fsBold];
-  MonitorName.Caption := GetMonitorName(Screen.Monitors[MonitorIdx].Handle);
+  MonitorName.Caption := GetMonitorName(Screen.Monitors[Screen.MonitorCount -
+    MonitorIdx - 1].Handle);
 
   ButtonSet := TButton.Create(Container);
   ButtonSet.Parent := Container;
