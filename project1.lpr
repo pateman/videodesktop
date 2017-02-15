@@ -13,6 +13,7 @@ uses
 {$R *.res}
 
 begin
+  Application.Title:='VideoDesktop';
   RequireDerivedFormResource:=True;
   Application.Initialize;
   Application.ShowMainForm := False;
