@@ -6,7 +6,7 @@ interface
 
 uses
   Windows, SysUtils, FileUtil, Forms, Controls, ExtCtrls, Dialogs, StdCtrls,
-  PasLibVlcUnit, Classes, MultiMon, Graphics;
+  PasLibVlcUnit, Classes, MultiMon, Graphics, IniFiles, regexpr;
 
 const
   PANEL_WIDTH = 220;
@@ -176,19 +176,23 @@ type
   private
     { private declarations }
     p_li: libvlc_instance_t_ptr;
+    Config: TIniFile;
+    WndHandles: array of TVideoWallpaper;
+    CurrentPanel: integer;
+    CurrentUser: string;
 
     procedure Initialize();
     procedure PanelButtonSetClick(Sender: TObject);
     procedure PanelButtonClearClick(Sender: TObject);
-    function GetMonitorName(const Hnd: HMONITOR): string;
     function CreatePanelForMonitor(const MonitorIdx: integer): TPanel;
 
     procedure HandlePanelScroll(const ScrollForward: boolean);
     procedure HandlePanelScrollButtons();
+
+    procedure SetVideoForMonitor(const MonitorIdx: integer; const FileName: string);
+    procedure StoreSettingForMonitor(const MonitorIdx: integer; const FileName: string);
   public
     { public declarations }
-    WndHandles: array of TVideoWallpaper;
-    CurrentPanel: integer;
   end;
 
   { TSnapshotThread }
@@ -245,6 +249,52 @@ begin
     LoadFromFile(GetScreenshotFileName(VideoWall^.CurrentVid));
 end;
 
+function GetCurrentUser(): string;
+var
+  nSize: DWord;
+begin
+  nSize := 1024;
+  SetLength(Result, nSize);
+  if GetUserName(PChar(Result), nSize) then
+    SetLength(Result, nSize - 1)
+  else
+    Result := '';
+end;
+
+function GetMonitorName(const Hnd: HMONITOR): string;
+type
+  TMonitorInfoEx = record
+    cbSize: DWORD;
+    rcMonitor: TRect;
+    rcWork: TRect;
+    dwFlags: DWORD;
+    szDevice: array[0..CCHDEVICENAME - 1] of AnsiChar;
+  end;
+var
+  DispDev: TDisplayDevice;
+  monInfo: TMonitorInfoEx;
+begin
+  Result := '';
+
+  monInfo.cbSize := sizeof(monInfo);
+  if GetMonitorInfo(Hnd, @monInfo) then
+  begin
+    DispDev.cb := SizeOf(DispDev);
+    EnumDisplayDevices(@monInfo.szDevice, 0, @DispDev, 0);
+    Result := StrPas(DispDev.DeviceString);
+  end;
+end;
+
+procedure SplitString(const Delimiter: char; const Str: string;
+  const ListOfStrings: TStrings);
+begin
+  ListOfStrings.Clear();
+
+  ListOfStrings.Delimiter := Delimiter;
+  ListOfStrings.StrictDelimiter := True;
+  ListOfStrings.DelimitedText := Str;
+end;
+
 { TSnapshotThread }
 
 procedure TSnapshotThread.Execute;
@@ -299,6 +349,10 @@ begin
   end;
 
   SetLength(Self.WndHandles, Screen.MonitorCount);
+  CurrentUser := GetCurrentUser();
+  Self.Config := TIniFile.Create(IncludeTrailingBackslash(
+    ExtractFilePath(Application.ExeName)) + 'config.ini', True);
+
   Self.Initialize();
 end;
 
@@ -333,9 +387,12 @@ begin
     DestroyWindow(WndHandles[I].WndHandle);
     Windows.UnRegisterClass(PChar(WndHandles[I].WndClassName), hInstance);
   end;
+
   SetLength(WndHandles, 0);
   libvlc_release(p_li);
+  Config.Free();
 
+  // Repaint the desktop.
   hObj := CreateComObject(CLSID_ActiveDesktop);
   ADesktop := hObj as IActiveDesktop;
   ADesktop.ApplyChanges(AD_APPLY_ALL or AD_APPLY_FORCE or AD_APPLY_BUFFERED_REFRESH);
@@ -350,6 +407,8 @@ end;
 procedure TForm1.Initialize;
 var
   I: integer;
+  SL, Split: TStringList;
+  Val: string;
 begin
   for I := 0 to Length(WndHandles) - 1 do
   begin
@@ -360,82 +419,41 @@ begin
   end;
 
   HandlePanelScrollButtons();
+
+  SL := TStringList.Create();
+  Split := TStringList.Create();
+  try
+    Config.ReadSectionValues(Self.CurrentUser, SL);
+    if (SL.Count > 0) then
+      for I := 0 to SL.Count - 1 do
+      begin
+        if ExecRegExpr('^Monitor_\d+', SL.Names[I]) then
+        begin
+          SplitString('_', SL.Names[I], Split);
+          Val := Trim(ReplaceRegExpr('\\\\(.{1,1})', SL.ValueFromIndex[I], '$1', True));
+
+          if ((Val <> '') and (FileExists(Val))) then
+            SetVideoForMonitor(StrToInt(Split[1]), Val);
+        end;
+      end;
+  finally
+    Split.Free();
+    SL.Free();
+  end;
 end;
 
 procedure TForm1.PanelButtonSetClick(Sender: TObject);
 var
-  Btn: TButton;
-  I, TaskbarHeight, W, H: integer;
-  Pth: string;
+  MonitorIdx: integer;
+  DstFile: string;
 begin
   if (OpenDialog1.Execute()) then
   begin
-    Btn := TButton(Sender);
-    I := Btn.Tag;
+    MonitorIdx := TButton(Sender).Tag;
+    DstFile := Trim(OpenDialog1.FileName);
 
-    if (WndHandles[I].WndHandle = 0) then
-    begin
-      WndHandles[I].WndClassName := 'VideoWallWnd' + IntToStr(I);
-      WndHandles[I].WndClass.hInstance := hInstance;
-      with WndHandles[I].WndClass do
-      begin
-        lpszClassName := PChar(WndHandles[I].WndClassName);
-        Style := CS_HREDRAW or CS_VREDRAW;
-        hIcon := LoadIcon(hInstance, 'MAINICON');
-        lpfnWndProc := @MyWndProc;
-        hbrBackground := CreateSolidBrush(RGB(I * 100, 0, 0));
-        hCursor := LoadCursor(0, IDC_ARROW);
-      end;
-      Windows.RegisterClass(WndHandles[I].WndClass);
-
-      TaskbarHeight := Screen.Monitors[I].Height -
-        Screen.Monitors[I].WorkareaRect.Bottom;
-      WndHandles[I].WndHandle :=
-        CreateWindow(PChar(WndHandles[I].WndClassName), 'VideoWallWnd',
-        WS_POPUP or WS_VISIBLE, Abs(Screen.Monitors[I].Left),
-        TaskbarHeight, Screen.Monitors[I].Width, Screen.Monitors[I].Height,
-        0, 0, hInstance, nil);
-
-      SetWindowLong(WndHandles[I].WndHandle, GWL_EXSTYLE,
-        GetWindowLong(WndHandles[I].WndHandle, GWL_EXSTYLE) or WS_EX_LAYERED);
-      SetLayeredWindowAttributes(WndHandles[I].WndHandle, RGB(255, 255, 255),
-        0, LWA_COLORKEY);
-
-      Windows.SetParent(WndHandles[I].WndHandle, WorkerW);
-    end;
-
-    Pth := Trim(OpenDialog1.FileName);
-    if (Length(Pth) = 0) then
-      exit;
-
-    WndHandles[I].MediaPtr := libvlc_media_new_path(p_li, PAnsiChar(UTF8Encode(Pth)));
-    if (WndHandles[I].MediaPtr <> nil) then
-    begin
-      if (WndHandles[I].VideoPtr <> nil) then
-      begin
-        libvlc_media_player_stop(WndHandles[I].VideoPtr);
-        libvlc_media_player_release(WndHandles[I].VideoPtr);
-      end;
-      WndHandles[I].VideoPtr :=
-        libvlc_media_player_new_from_media(WndHandles[I].MediaPtr);
-      if (WndHandles[I].VideoPtr <> nil) then
-      begin
-        WndHandles[I].CurrentVid := Pth;
-        WndHandles[I].EvtMgr :=
-          libvlc_media_player_event_manager(WndHandles[I].VideoPtr);
-        libvlc_video_set_key_input(WndHandles[I].VideoPtr, 1);
-        libvlc_video_set_mouse_input(WndHandles[I].VideoPtr, 1);
-        libvlc_media_add_option(WndHandles[I].MediaPtr, 'input-repeat=-1');
-        libvlc_media_player_set_display_window(WndHandles[I].VideoPtr,
-          WndHandles[I].WndHandle);
-
-        ShowWindow(WndHandles[I].WndHandle, SW_HIDE);
-        libvlc_media_player_play(WndHandles[I].VideoPtr);
-
-        TSnapshotThread.Create(WndHandles[I]);
-        libvlc_media_release(WndHandles[I].MediaPtr);
-      end;
-    end;
+    SetVideoForMonitor(MonitorIdx, DstFile);
+    StoreSettingForMonitor(MonitorIdx, DstFile);
   end;
 end;
 
@@ -455,30 +473,7 @@ begin
 
     TImage(WndHandles[I].VideoPathComponent.FindComponent(THUMB_COMPNAME)).
       Picture.Clear();
-  end;
-end;
-
-function TForm1.GetMonitorName(const Hnd: HMONITOR): string;
-type
-  TMonitorInfoEx = record
-    cbSize: DWORD;
-    rcMonitor: TRect;
-    rcWork: TRect;
-    dwFlags: DWORD;
-    szDevice: array[0..CCHDEVICENAME - 1] of AnsiChar;
-  end;
-var
-  DispDev: TDisplayDevice;
-  monInfo: TMonitorInfoEx;
-begin
-  Result := '';
-
-  monInfo.cbSize := sizeof(monInfo);
-  if GetMonitorInfo(Hnd, @monInfo) then
-  begin
-    DispDev.cb := SizeOf(DispDev);
-    EnumDisplayDevices(@monInfo.szDevice, 0, @DispDev, 0);
-    Result := StrPas(DispDev.DeviceString);
+    StoreSettingForMonitor(I, '');
   end;
 end;
 
@@ -570,6 +565,84 @@ procedure TForm1.HandlePanelScrollButtons;
 begin
   Button1.Enabled := (CurrentPanel > 0);
   Button2.Enabled := (CurrentPanel < (Length(WndHandles) - 1));
+end;
+
+procedure TForm1.SetVideoForMonitor(const MonitorIdx: integer; const FileName: string);
+var
+  Wnd: PVideoWallpaper;
+  TaskbarHeight: integer;
+begin
+  if (FileName = '') then
+    exit;
+
+  Wnd := @WndHandles[MonitorIdx];
+
+  if (Wnd^.WndHandle = 0) then
+  begin
+    Wnd^.WndClassName := 'VideoWallWnd' + IntToStr(MonitorIdx);
+    Wnd^.WndClass.hInstance := hInstance;
+    with Wnd^.WndClass do
+    begin
+      lpszClassName := PChar(Wnd^.WndClassName);
+      Style := CS_HREDRAW or CS_VREDRAW;
+      hIcon := LoadIcon(hInstance, 'MAINICON');
+      lpfnWndProc := @MyWndProc;
+      hbrBackground := CreateSolidBrush(RGB(MonitorIdx * 100, 0, 0));
+      hCursor := LoadCursor(0, IDC_ARROW);
+    end;
+    Windows.RegisterClass(Wnd^.WndClass);
+
+    TaskbarHeight := Screen.Monitors[MonitorIdx].Height -
+      Screen.Monitors[MonitorIdx].WorkareaRect.Bottom;
+    Wnd^.WndHandle :=
+      CreateWindow(PChar(Wnd^.WndClassName), 'VideoWallWnd', WS_POPUP or
+      WS_VISIBLE, Abs(Screen.Monitors[MonitorIdx].Left), TaskbarHeight,
+      Screen.Monitors[MonitorIdx].Width, Screen.Monitors[MonitorIdx].Height,
+      0, 0, hInstance, nil);
+
+    SetWindowLong(Wnd^.WndHandle, GWL_EXSTYLE,
+      GetWindowLong(Wnd^.WndHandle, GWL_EXSTYLE) or WS_EX_LAYERED);
+    SetLayeredWindowAttributes(Wnd^.WndHandle, RGB(255, 255, 255),
+      0, LWA_COLORKEY);
+
+    Windows.SetParent(Wnd^.WndHandle, WorkerW);
+  end;
+
+  Wnd^.MediaPtr := libvlc_media_new_path(p_li, PAnsiChar(UTF8Encode(FileName)));
+  if (Wnd^.MediaPtr <> nil) then
+  begin
+    if (Wnd^.VideoPtr <> nil) then
+    begin
+      libvlc_media_player_stop(Wnd^.VideoPtr);
+      libvlc_media_player_release(Wnd^.VideoPtr);
+    end;
+    Wnd^.VideoPtr :=
+      libvlc_media_player_new_from_media(Wnd^.MediaPtr);
+    if (Wnd^.VideoPtr <> nil) then
+    begin
+      Wnd^.CurrentVid := FileName;
+      Wnd^.EvtMgr :=
+        libvlc_media_player_event_manager(Wnd^.VideoPtr);
+      libvlc_video_set_key_input(Wnd^.VideoPtr, 1);
+      libvlc_video_set_mouse_input(Wnd^.VideoPtr, 1);
+      libvlc_media_add_option(Wnd^.MediaPtr, 'input-repeat=-1');
+      libvlc_media_player_set_display_window(Wnd^.VideoPtr,
+        Wnd^.WndHandle);
+
+      ShowWindow(Wnd^.WndHandle, SW_HIDE);
+      libvlc_media_player_play(Wnd^.VideoPtr);
+
+      TSnapshotThread.Create(Wnd^);
+      libvlc_media_release(Wnd^.MediaPtr);
+    end;
+  end;
+end;
+
+procedure TForm1.StoreSettingForMonitor(const MonitorIdx: integer;
+  const FileName: string);
+begin
+  Config.WriteString(Self.CurrentUser, 'Monitor_' + IntToStr(MonitorIdx),
+    ReplaceRegExpr('(\W)', FileName, '\\\\$1', True));
 end;
 
 end.
