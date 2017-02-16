@@ -4322,12 +4322,6 @@ object Form1: TForm1
     left = 96
     top = 48
   end
-  object ApplicationProperties1: TApplicationProperties
-    ShowMainForm = False
-    OnMinimize = ApplicationProperties1Minimize
-    left = 56
-    top = 48
-  end
   object ImageList1: TImageList
     Height = 86
     Width = 128
@@ -5718,6 +5712,7 @@ object Form1: TForm1
     top = 49
     object MenuItem1: TMenuItem
       Caption = 'Settings'
+      OnClick = MenuItem1Click
     end
     object MenuItem2: TMenuItem
       Caption = 'About'

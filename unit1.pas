@@ -30,7 +30,6 @@ type
 
   { TForm1 }
   TForm1 = class(TForm)
-    ApplicationProperties1: TApplicationProperties;
     ImageList1: TImageList;
     MainMenu1: TMainMenu;
     MenuItem1: TMenuItem;
@@ -38,15 +37,14 @@ type
     OpenDialog1: TOpenDialog;
     ScrollBox1: TScrollBox;
     TrayIcon1: TTrayIcon;
-    procedure ApplicationProperties1Minimize(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure MenuItem1Click(Sender: TObject);
     procedure MenuItem2Click(Sender: TObject);
     procedure TrayIcon1DblClick(Sender: TObject);
   private
     { private declarations }
     p_li: libvlc_instance_t_ptr;
-    Config: TIniFile;
     WndHandles: array of TVideoWallpaper;
     CurrentUser: string;
 
@@ -57,6 +55,8 @@ type
 
     procedure SetVideoForMonitor(const MonitorIdx: integer; const FileName: string);
     procedure StoreSettingForMonitor(const MonitorIdx: integer; const FileName: string);
+
+    procedure MyOnSize(var Msg: TMessage); message WM_SIZE;
   public
     { public declarations }
   end;
@@ -81,7 +81,7 @@ implementation
 {$R *.lfm}
 
 uses
-  ShlObj, ComObj, ufunctions, Unit2;
+  ShlObj, ComObj, ufunctions, Unit2, Unit3;
 
 function EnumWindowsProc(_para1: HWND; _para2: LPARAM): WINBOOL; stdcall;
 begin
@@ -165,15 +165,8 @@ begin
 
   SetLength(Self.WndHandles, Screen.MonitorCount);
   CurrentUser := GetCurrentUser();
-  Self.Config := TIniFile.Create(IncludeTrailingBackslash(
-    ExtractFilePath(Application.ExeName)) + 'config.ini', True);
 
   Self.Initialize();
-end;
-
-procedure TForm1.ApplicationProperties1Minimize(Sender: TObject);
-begin
-  Application.Minimize();
 end;
 
 procedure TForm1.FormDestroy(Sender: TObject);
@@ -203,6 +196,16 @@ begin
   ADesktop.ApplyChanges(AD_APPLY_ALL or AD_APPLY_FORCE or AD_APPLY_BUFFERED_REFRESH);
 end;
 
+procedure TForm1.MenuItem1Click(Sender: TObject);
+begin
+  Form3 := TForm3.Create(Application);
+  try
+    Form3.ShowModal();
+  finally
+    Form3.Free();
+  end;
+end;
+
 procedure TForm1.MenuItem2Click(Sender: TObject);
 begin
   Form2 := TForm2.Create(Application);
@@ -215,8 +218,8 @@ end;
 
 procedure TForm1.TrayIcon1DblClick(Sender: TObject);
 begin
-  Self.Show();
   Application.Restore();
+  Self.Show();
 end;
 
 procedure TForm1.Initialize;
@@ -225,6 +228,8 @@ var
   SL, Split: TStringList;
   Val: string;
 begin
+  InitializeConfig();
+
   for I := 0 to Length(WndHandles) - 1 do
   begin
     WndHandles[I].VideoPathComponent :=
@@ -414,7 +419,8 @@ begin
         libvlc_media_player_event_manager(Wnd^.VideoPtr);
       libvlc_video_set_key_input(Wnd^.VideoPtr, 1);
       libvlc_video_set_mouse_input(Wnd^.VideoPtr, 1);
-      libvlc_media_add_option(Wnd^.MediaPtr, 'input-repeat=-1');
+      if (Config.ReadBool(GLOBAL_SECTION, LOOPVIDEOS_VALUE, True)) then
+        libvlc_media_add_option(Wnd^.MediaPtr, 'input-repeat=-1');
       libvlc_media_player_set_display_window(Wnd^.VideoPtr,
         Wnd^.WndHandle);
 
@@ -432,6 +438,13 @@ procedure TForm1.StoreSettingForMonitor(const MonitorIdx: integer;
 begin
   Config.WriteString(Self.CurrentUser, 'Monitor_' + IntToStr(MonitorIdx),
     ReplaceRegExpr('(\W)', FileName, '\\\\$1', True));
+end;
+
+procedure TForm1.MyOnSize(var Msg: TMessage);
+begin
+  if (Msg.wParam = SIZE_MINIMIZED) then
+     Self.Hide();
+  Msg.Result := 1;
 end;
 
 end.
