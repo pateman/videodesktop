@@ -1,47 +1,29 @@
 object Form1: TForm1
-  Left = 348
-  Height = 209
-  Top = 380
-  Width = 245
+  Left = 470
+  Height = 254
+  Top = 336
+  Width = 273
   BorderIcons = [biSystemMenu, biMinimize]
   BorderStyle = bsSingle
-  Caption = 'VideoDesktop'
-  ClientHeight = 209
-  ClientWidth = 245
+  Caption = 'VideoDesktop v.1.0'
+  ClientHeight = 234
+  ClientWidth = 273
+  Menu = MainMenu1
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   Position = poScreenCenter
   LCLVersion = '1.6.2.0'
   object ScrollBox1: TScrollBox
     Left = 8
-    Height = 192
+    Height = 215
     Top = 8
-    Width = 220
+    Width = 256
     HorzScrollBar.Increment = 1
     HorzScrollBar.Page = 1
     HorzScrollBar.Smooth = True
-    HorzScrollBar.Visible = False
     VertScrollBar.Page = 1
     VertScrollBar.Visible = False
     TabOrder = 0
-  end
-  object Button1: TButton
-    Left = 0
-    Height = 25
-    Top = 80
-    Width = 24
-    Caption = '<'
-    OnClick = Button1Click
-    TabOrder = 1
-  end
-  object Button2: TButton
-    Left = 216
-    Height = 25
-    Top = 80
-    Width = 24
-    Caption = '>'
-    OnClick = Button2Click
-    TabOrder = 2
   end
   object TrayIcon1: TTrayIcon
     Icon.Data = {
@@ -4331,26 +4313,26 @@ object Form1: TForm1
     }
     Visible = True
     OnDblClick = TrayIcon1DblClick
-    left = 104
-    top = 8
+    left = 16
+    top = 48
   end
   object OpenDialog1: TOpenDialog
     Filter = 'All files|*.*'
     Options = [ofReadOnly, ofPathMustExist, ofFileMustExist, ofEnableSizing, ofViewDetail]
-    left = 184
-    top = 8
+    left = 96
+    top = 48
   end
   object ApplicationProperties1: TApplicationProperties
     ShowMainForm = False
     OnMinimize = ApplicationProperties1Minimize
-    left = 144
-    top = 8
+    left = 56
+    top = 48
   end
   object ImageList1: TImageList
     Height = 86
     Width = 128
-    left = 240
-    top = 8
+    left = 136
+    top = 48
     Bitmap = {
       4C6901000000800000005600000093939300FFFFFF6BFFFFFFF0FFFFFFFAFFFF
       FFF3FFFFFFF2FFFFFFF2FFFFFFF2FFFFFFF2FFFFFFF2FFFFFFF2FFFFFFF2FFFF
@@ -5730,5 +5712,16 @@ object Form1: TForm1
       FE00FEFEFE00FEFEFE00FEFEFE00FEFEFE00FEFEFE00FEFEFE00FEFEFE00FEFE
       FE00F9F9F900FCFCFC00BEBEBE00
     }
+  end
+  object MainMenu1: TMainMenu
+    left = 176
+    top = 49
+    object MenuItem1: TMenuItem
+      Caption = 'Settings'
+    end
+    object MenuItem2: TMenuItem
+      Caption = 'About'
+      OnClick = MenuItem2Click
+    end
   end
 end

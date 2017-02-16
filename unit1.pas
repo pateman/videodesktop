@@ -5,8 +5,8 @@ unit Unit1;
 interface
 
 uses
-  Windows, SysUtils, FileUtil, Forms, Controls, ExtCtrls, Dialogs, StdCtrls,
-  PasLibVlcUnit, Classes, MultiMon, Graphics, IniFiles, regexpr;
+  Windows, SysUtils, Forms, Controls, ExtCtrls, Dialogs, StdCtrls,
+  PasLibVlcUnit, Classes, Graphics, Menus, IniFiles, regexpr, uwinapi;
 
 const
   PANEL_WIDTH = 220;
@@ -14,138 +14,8 @@ const
   THUMB_HEIGHT = 55;
   THUMB_COMPNAME = 'thumb';
 
-  PW_CLIENTONLY = $00000001;
-  INTERNET_MAX_PATH_LENGTH = 2048;
-  INTERNET_MAX_SCHEME_LENGTH = 32;         // longest protocol name length
-  INTERNET_MAX_URL_LENGTH =
-    INTERNET_MAX_SCHEME_LENGTH + Length('://') + 1 + INTERNET_MAX_PATH_LENGTH;
-  AD_APPLY_SAVE = $00000001;
-  AD_APPLY_HTMLGEN = $00000002;
-  AD_APPLY_REFRESH = $00000004;
-  AD_APPLY_ALL = AD_APPLY_SAVE or AD_APPLY_HTMLGEN or AD_APPLY_REFRESH;
-  AD_APPLY_FORCE = $00000008;
-  AD_APPLY_BUFFERED_REFRESH = $00000010;
-  AD_APPLY_DYNAMICREFRESH = $00000020;
-
 type
-  PCompPos = ^TCompPos;
-
-  _tagCOMPPOS = record
-    dwSize: DWORD;                  // Size of this structure
-    iLeft: integer;                 // Left of top-left corner in screen co-ordinates.
-    iTop: integer;                  // Top of top-left corner in screen co-ordinates.
-    dwWidth: DWORD;                 // Width in pixels.
-    dwHeight: DWORD;                // Height in pixels.
-    izIndex: integer;               // Indicates the Z-order of the component.
-    fCanResize: BOOL;               // Is the component resizeable?
-    fCanResizeX: BOOL;              // Resizeable in X-direction?
-    fCanResizeY: BOOL;              // Resizeable in Y-direction?
-    iPreferredLeftPercent: integer; // Left of top-left corner as percent of screen width
-    iPreferredTopPercent: integer;  // Top of top-left corner as percent of screen height
-  end;
-  COMPPOS = _tagCOMPPOS;
-  TCompPos = _tagCOMPPOS;
-
-  PCompStateInfo = ^TCompStateInfo;
-
-  _tagCOMPSTATEINFO = record
-    dwSize: DWORD;             // Size of this structure.
-    iLeft: integer;            // Left of the top-left corner in screen co-ordinates.
-    iTop: integer;             // Top of top-left corner in screen co-ordinates.
-    dwWidth: DWORD;            // Width in pixels.
-    dwHeight: DWORD;           // Height in pixels.
-    dwItemState: DWORD;
-    // State of the component (full-screen mode or split-screen or normal state.
-  end;
-  COMPSTATEINFO = _tagCOMPSTATEINFO;
-  TCompStateInfo = _tagCOMPSTATEINFO;
-
-  PWallPaperOpt = ^TWallPaperOpt;
-
-  _tagWALLPAPEROPT = record
-    dwSize: DWORD;     // size of this Structure.
-    dwStyle: DWORD;    // WPSTYLE_* mentioned above
-  end;
-  WALLPAPEROPT = _tagWALLPAPEROPT;
-  TWallPaperOpt = _tagWALLPAPEROPT;
-
-  PComponentsOpt = ^TComponentsOpt;
-
-  _tagCOMPONENTSOPT = record
-    dwSize: DWORD;            // Size of this structure
-    fEnableComponents: BOOL;  // Enable components?
-    fActiveDesktop: BOOL;     // Active desktop enabled ?
-  end;
-  COMPONENTSOPT = _tagCOMPONENTSOPT;
-  TComponentsOpt = _tagCOMPONENTSOPT;
-
-  PComponent = ^COMPONENT;
-
-  _tagCOMPONENT = record
-    dwSize: DWORD;               // Size of this structure
-    dwID: DWORD;                 // Reserved: Set it always to zero.
-    iComponentType: integer;     // One of COMP_TYPE_*
-    fChecked: BOOL;              // Is this component enabled?
-    fDirty: BOOL;
-    // Had the component been modified and not yet saved to disk?
-    fNoScroll: BOOL;             // Is the component scrollable?
-    cpPos: COMPPOS;              // Width, height etc.,
-    wszFriendlyName: array[0..MAX_PATH - 1] of widechar;
-    // Friendly name of component.
-    wszSource: array[0..INTERNET_MAX_URL_LENGTH - 1] of widechar;
-    // URL of the component.
-    wszSubscribedURL: array[0..INTERNET_MAX_URL_LENGTH - 1] of widechar;
-    // Subscrined URL
-
-    //New fields are added below. Everything above here must exactly match the IE4COMPONENT Structure.
-    dwCurItemState: DWORD;       // Current state of the Component.
-    csiOriginal: TCompStateInfo;
-    // Original state of the component when it was first added.
-    csiRestored: TCompStateInfo; // Restored state of the component.
-  end;
-  COMPONENT = _tagCOMPONENT;
-
-  IActiveDesktop = interface(IUnknown)
-    ['{F490EB00-1240-11D1-9888-006097DEACF9}']
-    function ApplyChanges(dwFlags: DWORD): HResult; stdcall;
-    function GetWallpaper(pwszWallpaper: PWideChar; cchWallpaper: UINT;
-      dwReserved: DWORD): HResult; stdcall;
-    function SetWallpaper(pwszWallpaper: PWideChar;
-      dwReserved: DWORD): HResult; stdcall;
-    function GetWallpaperOptions(out pwpo: TWallPaperOpt;
-      dwReserved: DWORD): HResult; stdcall;
-    function SetWallpaperOptions(const pwpo: TWallPaperOpt;
-      dwReserved: DWORD): HResult; stdcall;
-    function GetPattern(pwszPattern: PWideChar; cchPattern: UINT;
-      dwReserved: DWORD): HResult; stdcall;
-    function SetPattern(pwszPattern: PWideChar;
-      dwReserved: DWORD): HResult; stdcall;
-    function GetDesktopItemOptions(out pco: TComponentsOpt;
-      dwReserved: DWORD): HResult; stdcall;
-    function SetDesktopItemOptions(const pco: TComponentsOpt;
-      dwReserved: DWORD): HResult; stdcall;
-    function AddDesktopItem(var pcomp: COMPONENT;
-      dwReserved: DWORD): HResult; stdcall;
-    function AddDesktopItemWithUI(hwnd: HWND; var pcomp: COMPONENT;
-      dwReserved: DWORD): HResult; stdcall;
-    function ModifyDesktopItem(var pcomp: COMPONENT;
-      dwFlags: DWORD): HResult; stdcall;
-    function RemoveDesktopItem(var pcomp: COMPONENT;
-      dwReserved: DWORD): HResult; stdcall;
-    function GetDesktopItemCount(out lpiCount: integer;
-      dwReserved: DWORD): HResult; stdcall;
-    function GetDesktopItem(nComponent: integer; var pcomp: COMPONENT;
-      dwReserved: DWORD): HResult; stdcall;
-    function GetDesktopItemByID(dwID: ULONG; var pcomp: COMPONENT;
-      dwReserved: DWORD): HResult; stdcall;
-    function GenerateDesktopItemHtml(pwszFileName: PWideChar;
-      var pcomp: COMPONENT; dwReserved: DWORD): HResult; stdcall;
-    function AddUrl(hwnd: HWND; pszSource: PWideChar; var pcomp: COMPONENT;
-      dwFlags: DWORD): HResult; stdcall;
-    function GetDesktopItemBySource(pwszSource: PWideChar;
-      var pcomp: COMPONENT; dwReserved: DWORD): HResult; stdcall;
-  end;
-
+  { TVideoWallpaper }
   TVideoWallpaper = record
     WndHandle: HWND;
     WndClassName: string;
@@ -161,33 +31,29 @@ type
   { TForm1 }
   TForm1 = class(TForm)
     ApplicationProperties1: TApplicationProperties;
-    Button1: TButton;
-    Button2: TButton;
     ImageList1: TImageList;
+    MainMenu1: TMainMenu;
+    MenuItem1: TMenuItem;
+    MenuItem2: TMenuItem;
     OpenDialog1: TOpenDialog;
     ScrollBox1: TScrollBox;
     TrayIcon1: TTrayIcon;
     procedure ApplicationProperties1Minimize(Sender: TObject);
-    procedure Button1Click(Sender: TObject);
-    procedure Button2Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure MenuItem2Click(Sender: TObject);
     procedure TrayIcon1DblClick(Sender: TObject);
   private
     { private declarations }
     p_li: libvlc_instance_t_ptr;
     Config: TIniFile;
     WndHandles: array of TVideoWallpaper;
-    CurrentPanel: integer;
     CurrentUser: string;
 
     procedure Initialize();
     procedure PanelButtonSetClick(Sender: TObject);
     procedure PanelButtonClearClick(Sender: TObject);
     function CreatePanelForMonitor(const MonitorIdx: integer): TPanel;
-
-    procedure HandlePanelScroll(const ScrollForward: boolean);
-    procedure HandlePanelScrollButtons();
 
     procedure SetVideoForMonitor(const MonitorIdx: integer; const FileName: string);
     procedure StoreSettingForMonitor(const MonitorIdx: integer; const FileName: string);
@@ -196,12 +62,13 @@ type
   end;
 
   { TSnapshotThread }
-
-  TSnapshotThread = class(TThread)
+  TSnapshotThread = class sealed(TThread)
   protected
+    { protected declarations }
     VideoWall: TVideoWallpaper;
     procedure Execute; override;
   public
+    { public declarations }
     constructor Create(const Wall: TVideoWallpaper);
   end;
 
@@ -214,7 +81,7 @@ implementation
 {$R *.lfm}
 
 uses
-  ShlObj, ComObj;
+  ShlObj, ComObj, ufunctions, Unit2;
 
 function EnumWindowsProc(_para1: HWND; _para2: LPARAM): WINBOOL; stdcall;
 begin
@@ -229,12 +96,6 @@ begin
   Result := DefWindowProc(_para1, _para2, _para3, _para4);
 end;
 
-function GetScreenshotFileName(const VidFile: string): string;
-begin
-  Result := IncludeTrailingBackslash(ExtractFilePath(Application.ExeName)) +
-    ChangeFileExt(ExtractFileName(VidFile), '.png');
-end;
-
 procedure SnapshotTaken(p_event: libvlc_event_t_ptr; Data: Pointer); cdecl;
 var
   VideoWall: PVideoWallpaper;
@@ -247,52 +108,6 @@ begin
   ShowWindow(VideoWall^.WndHandle, SW_SHOW);
   TImage(VideoWall^.VideoPathComponent.FindComponent(THUMB_COMPNAME)).Picture.
     LoadFromFile(GetScreenshotFileName(VideoWall^.CurrentVid));
-end;
-
-function GetCurrentUser(): string;
-var
-  nSize: DWord;
-begin
-  nSize := 1024;
-  SetLength(Result, nSize);
-  if GetUserName(PChar(Result), nSize) then
-    SetLength(Result, nSize - 1)
-  else
-    Result := '';
-end;
-
-function GetMonitorName(const Hnd: HMONITOR): string;
-type
-  TMonitorInfoEx = record
-    cbSize: DWORD;
-    rcMonitor: TRect;
-    rcWork: TRect;
-    dwFlags: DWORD;
-    szDevice: array[0..CCHDEVICENAME - 1] of AnsiChar;
-  end;
-var
-  DispDev: TDisplayDevice;
-  monInfo: TMonitorInfoEx;
-begin
-  Result := '';
-
-  monInfo.cbSize := sizeof(monInfo);
-  if GetMonitorInfo(Hnd, @monInfo) then
-  begin
-    DispDev.cb := SizeOf(DispDev);
-    EnumDisplayDevices(@monInfo.szDevice, 0, @DispDev, 0);
-    Result := StrPas(DispDev.DeviceString);
-  end;
-end;
-
-procedure SplitString(const Delimiter: char; const Str: string;
-  const ListOfStrings: TStrings);
-begin
-  ListOfStrings.Clear();
-
-  ListOfStrings.Delimiter := Delimiter;
-  ListOfStrings.StrictDelimiter := True;
-  ListOfStrings.DelimitedText := Str;
 end;
 
 { TSnapshotThread }
@@ -356,16 +171,6 @@ begin
   Self.Initialize();
 end;
 
-procedure TForm1.Button1Click(Sender: TObject);
-begin
-  HandlePanelScroll(False);
-end;
-
-procedure TForm1.Button2Click(Sender: TObject);
-begin
-  HandlePanelScroll(True);
-end;
-
 procedure TForm1.ApplicationProperties1Minimize(Sender: TObject);
 begin
   Application.Minimize();
@@ -398,6 +203,16 @@ begin
   ADesktop.ApplyChanges(AD_APPLY_ALL or AD_APPLY_FORCE or AD_APPLY_BUFFERED_REFRESH);
 end;
 
+procedure TForm1.MenuItem2Click(Sender: TObject);
+begin
+  Form2 := TForm2.Create(Application);
+  try
+    Form2.ShowModal();
+  finally
+    Form2.Free();
+  end;
+end;
+
 procedure TForm1.TrayIcon1DblClick(Sender: TObject);
 begin
   Self.Show();
@@ -417,8 +232,6 @@ begin
     WndHandles[I].VideoPathComponent.Parent := ScrollBox1;
     WndHandles[I].VideoPathComponent.Left := I * WndHandles[I].VideoPathComponent.Width;
   end;
-
-  HandlePanelScrollButtons();
 
   SL := TStringList.Create();
   Split := TStringList.Create();
@@ -541,30 +354,6 @@ begin
   ButtonClear.Tag := MonitorIdx;
 
   Result := Container;
-end;
-
-procedure TForm1.HandlePanelScroll(const ScrollForward: boolean);
-var
-  ScrollDelta: integer;
-begin
-  if (ScrollForward) then
-  begin
-    ScrollDelta := -PANEL_WIDTH;
-    Inc(CurrentPanel);
-  end
-  else
-  begin
-    ScrollDelta := PANEL_WIDTH;
-    Dec(CurrentPanel);
-  end;
-  ScrollBox1.ScrollBy(ScrollDelta, 0);
-  HandlePanelScrollButtons();
-end;
-
-procedure TForm1.HandlePanelScrollButtons;
-begin
-  Button1.Enabled := (CurrentPanel > 0);
-  Button2.Enabled := (CurrentPanel < (Length(WndHandles) - 1));
 end;
 
 procedure TForm1.SetVideoForMonitor(const MonitorIdx: integer; const FileName: string);
