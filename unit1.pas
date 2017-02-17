@@ -228,7 +228,12 @@ var
   SL, Split: TStringList;
   Val: string;
 begin
-  InitializeConfig();
+  if (not InitializeConfig()) then
+  begin
+    TrayIcon1.BalloonTitle := 'VideoDesktop';
+    TrayIcon1.BalloonHint := 'I am in the tray! Double click the icon to open';
+    TrayIcon1.ShowBalloonHint();
+  end;
 
   for I := 0 to Length(WndHandles) - 1 do
   begin

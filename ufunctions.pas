@@ -17,7 +17,7 @@ procedure SplitString(const Delimiter: char; const Str: string;
   const ListOfStrings: TStrings);
 function GetMonitorName(const Hnd: HMONITOR): string;
 function GetCurrentUser(): string;
-procedure InitializeConfig();
+function InitializeConfig(): Boolean;
 
 var
   Config: TIniFile;
@@ -79,13 +79,14 @@ begin
     Result := '';
 end;
 
-procedure InitializeConfig();
+function InitializeConfig(): Boolean;
 begin
   Config := TIniFile.Create(IncludeTrailingBackslash(
     ExtractFilePath(Application.ExeName)) + 'config.ini', True);
 
   // Populate the configuration file with defualt values.
-  if (not Config.SectionExists(GLOBAL_SECTION)) then
+  Result := Config.SectionExists(GLOBAL_SECTION);
+  if (not Result) then
   begin
     Config.WriteBool(GLOBAL_SECTION, RUNONSTARTUP_VALUE, True);
     Config.WriteBool(GLOBAL_SECTION, LOOPVIDEOS_VALUE, True);
