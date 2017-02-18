@@ -75,6 +75,7 @@ type
 var
   Form1: TForm1;
   WorkerW: HWND;
+  Tst: TList;
 
 implementation
 
@@ -110,6 +111,13 @@ begin
     LoadFromFile(GetScreenshotFileName(VideoWall^.CurrentVid));
 end;
 
+//function MyEnumMonitors(hMonitor: HMONITOR; hdcMonitor: HDC; lprcMonitor: PRect;
+    //dwData: LPARAM): LongBool; stdcall;
+//begin
+  //ShowMessage(GetMonitorName(hMonitor));
+  //Result := True;
+//end;
+
 { TSnapshotThread }
 
 procedure TSnapshotThread.Execute;
@@ -141,6 +149,7 @@ procedure TForm1.FormCreate(Sender: TObject);
 var
   Progman: HWND;
   Res: DWORD;
+  I: Integer;
 begin
   Progman := FindWindow('Progman', nil);
   SendMessageTimeout(Progman, $052C, 0, 0, SMTO_NORMAL, 1000, Res);
@@ -342,8 +351,7 @@ begin
   MonitorName.Width := Container.Width;
   MonitorName.Alignment := taCenter;
   MonitorName.Font.Style := [fsBold];
-  MonitorName.Caption := GetMonitorName(Screen.Monitors[Screen.MonitorCount -
-    MonitorIdx - 1].Handle);
+  MonitorName.Caption := GetMonitorName(Screen.Monitors[MonitorIdx].Handle);
 
   ButtonSet := TButton.Create(Container);
   ButtonSet.Parent := Container;
@@ -451,5 +459,10 @@ begin
      Self.Hide();
   Msg.Result := 1;
 end;
+
+initialization
+              Tst := TList.Create();
+finalization
+            Tst.Free;
 
 end.

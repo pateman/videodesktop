@@ -6,13 +6,14 @@ object Form1: TForm1
   BorderIcons = [biSystemMenu, biMinimize]
   BorderStyle = bsSingle
   Caption = 'VideoDesktop v.1.0'
-  ClientHeight = 234
+  ClientHeight = 254
   ClientWidth = 273
   Menu = MainMenu1
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   Position = poScreenCenter
   LCLVersion = '1.6.2.0'
+  Visible = False
   object ScrollBox1: TScrollBox
     Left = 8
     Height = 215
@@ -10041,7 +10042,7 @@ object Form1: TForm1
     top = 48
   end
   object OpenDialog1: TOpenDialog
-    Filter = 'All files|*.*'
+    Filter = 'Video files|*.avi;*.mkv;*.mpg;*.mp4;*.webm;*.rmvb;*.divx;*.rm;*.mpeg'
     Options = [ofReadOnly, ofPathMustExist, ofFileMustExist, ofEnableSizing, ofViewDetail]
     left = 96
     top = 48

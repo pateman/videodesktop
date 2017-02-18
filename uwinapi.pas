@@ -132,6 +132,11 @@ type
       var pcomp: COMPONENT; dwReserved: DWORD): HResult; stdcall;
   end;
 
+  MonitorEnumProc = function(hMonitor: HMONITOR; hdcMonitor: HDC; lprcMonitor: PRect;
+    dwData: LPARAM): LongBool; stdcall;
+
+  function EnumDisplayMonitors(hdc: HDC; lprcClip: PRect; lpfnEnum: MonitorEnumProc; dwData: LPARAM): LongBool; external 'user32' name 'EnumDisplayMonitors';
+
 implementation
 
 end.
