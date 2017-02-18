@@ -18,6 +18,7 @@ procedure SplitString(const Delimiter: char; const Str: string;
 function GetMonitorName(const Hnd: HMONITOR): string;
 function GetCurrentUser(): string;
 function InitializeConfig(): boolean;
+function RECTToString(const R: TRect): String;
 
 var
   Config: TIniFile;
@@ -25,7 +26,7 @@ var
 implementation
 
 uses
-  SysUtils, Forms, Multimon, ActiveX, ComObj, Variants, Dialogs, Character;
+  SysUtils, Forms, Multimon, ActiveX, ComObj, Variants, Character;
 
 function TrimLeadingZeros(const S: string): string;
 var
@@ -162,6 +163,11 @@ begin
     Config.WriteBool(GLOBAL_SECTION, RUNONSTARTUP_VALUE, True);
     Config.WriteBool(GLOBAL_SECTION, LOOPVIDEOS_VALUE, True);
   end;
+end;
+
+function RECTToString(const R: TRect): String;
+begin
+  Result := Format('(%d, %d) (%d, %d)', [R.Left, R.Top, R.Right, R.Bottom]);
 end;
 
 end.

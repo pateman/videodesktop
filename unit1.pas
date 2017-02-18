@@ -75,7 +75,6 @@ type
 var
   Form1: TForm1;
   WorkerW: HWND;
-  Tst: TList;
 
 implementation
 
@@ -112,10 +111,10 @@ begin
 end;
 
 //function MyEnumMonitors(hMonitor: HMONITOR; hdcMonitor: HDC; lprcMonitor: PRect;
-    //dwData: LPARAM): LongBool; stdcall;
+//dwData: LPARAM): LongBool; stdcall;
 //begin
-  //ShowMessage(GetMonitorName(hMonitor));
-  //Result := True;
+//ShowMessage(GetMonitorName(hMonitor));
+//Result := True;
 //end;
 
 { TSnapshotThread }
@@ -149,13 +148,15 @@ procedure TForm1.FormCreate(Sender: TObject);
 var
   Progman: HWND;
   Res: DWORD;
-  I: Integer;
+  I: integer;
 begin
   Progman := FindWindow('Progman', nil);
   SendMessageTimeout(Progman, $052C, 0, 0, SMTO_NORMAL, 1000, Res);
   EnumWindows(@EnumWindowsProc, 0);
 
-  libvlc_dynamic_dll_init();
+  libvlc_dynamic_dll_init_with_path(
+    UTF8Encode(IncludeTrailingBackslash(ExtractFilePath(Application.ExeName)) +
+    'libvlc\'));
 
   if (libvlc_dynamic_dll_error <> '') then
   begin
@@ -164,9 +165,9 @@ begin
   end;
 
   with TArgcArgs.Create([libvlc_dynamic_dll_path, '--intf=dummy',
-      '--ignore-config', '--quiet', '--vout=direct3d', '--no-video-title-show',
-      '--no-video-on-top', '--no-snapshot-preview', '--no-stats',
-      '--no-sub-autodetect-file', '--quiet', '--freetype-opacity=0']) do
+      '--ignore-config', '--quiet', '--vout=direct3d', '--aout=dummy',
+      '--no-video-title-show', '--no-video-on-top', '--no-snapshot-preview',
+      '--no-stats', '--no-sub-autodetect-file', '--quiet', '--freetype-opacity=0']) do
   begin
     p_li := libvlc_new(ARGC, ARGS);
     Free();
@@ -403,7 +404,7 @@ begin
       Screen.Monitors[MonitorIdx].WorkareaRect.Bottom;
     Wnd^.WndHandle :=
       CreateWindow(PChar(Wnd^.WndClassName), 'VideoWallWnd', WS_POPUP or
-      WS_VISIBLE, Abs(Screen.Monitors[MonitorIdx].Left), TaskbarHeight,
+      WS_VISIBLE, Abs(Screen.Monitors[MonitorIdx].Left), -TaskbarHeight,
       Screen.Monitors[MonitorIdx].Width, Screen.Monitors[MonitorIdx].Height,
       0, 0, hInstance, nil);
 
@@ -456,13 +457,8 @@ end;
 procedure TForm1.MyOnSize(var Msg: TMessage);
 begin
   if (Msg.wParam = SIZE_MINIMIZED) then
-     Self.Hide();
+    Self.Hide();
   Msg.Result := 1;
 end;
-
-initialization
-              Tst := TList.Create();
-finalization
-            Tst.Free;
 
 end.
