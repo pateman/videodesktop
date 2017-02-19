@@ -28,6 +28,13 @@ type
   end;
   PVideoWallpaper = ^TVideoWallpaper;
 
+  { TWin7Info }
+  TWin7Info = packed record
+    IsWin7: boolean;
+    IsAeroOn: boolean;
+  end;
+  PWin7Info = ^TWin7Info;
+
   { TForm1 }
   TForm1 = class(TForm)
     ImageList1: TImageList;
@@ -84,8 +91,11 @@ uses
   ShlObj, ComObj, ufunctions, Unit2, Unit3;
 
 function EnumWindowsProc(_para1: HWND; _para2: LPARAM): WINBOOL; stdcall;
+var
+  ShellWnd: HWND;
 begin
-  if (FindWindowEx(_para1, 0, 'SHELLDLL_DefView', nil) > 0) then
+  ShellWnd := FindWindowEx(_para1, 0, 'SHELLDLL_DefView', nil);
+  if (ShellWnd > 0) then
     WorkerW := FindWindowEx(0, _para1, 'WorkerW', nil);
   Result := True;
 end;
@@ -109,13 +119,6 @@ begin
   TImage(VideoWall^.VideoPathComponent.FindComponent(THUMB_COMPNAME)).Picture.
     LoadFromFile(GetScreenshotFileName(VideoWall^.CurrentVid));
 end;
-
-//function MyEnumMonitors(hMonitor: HMONITOR; hdcMonitor: HDC; lprcMonitor: PRect;
-//dwData: LPARAM): LongBool; stdcall;
-//begin
-//ShowMessage(GetMonitorName(hMonitor));
-//Result := True;
-//end;
 
 { TSnapshotThread }
 
@@ -148,11 +151,41 @@ procedure TForm1.FormCreate(Sender: TObject);
 var
   Progman: HWND;
   Res: DWORD;
-  I: integer;
+  Win7Info: TWin7Info;
 begin
+  if ((Win32MajorVersion < 5) or ((Win32MajorVersion = 6) and
+    (Win32MinorVersion = 0))) then
+  begin
+    Application.MessageBox(
+      'You are running an unsupported version of operating system. VideoDesktop was designed to work on Windows 7 and later.'
+      + #13#10 + #13#10 +
+      'If you believe that this is an issue, please contact the support.',
+      'Unsupported OS', MB_OK + MB_ICONSTOP);
+    Application.Terminate();
+    exit;
+  end;
+
+  Win7Info.IsWin7 := IsWin7();
+  Win7Info.IsAeroOn := IsAeroEnabled();
+
+  if ((Win7Info.IsWin7) and (not Win7Info.IsAeroOn)) then
+  begin
+    Application.MessageBox(
+      'VideoDesktop requires Aero. Please enable Aero and run VideoDesktop again.' +
+      #13#10 + #13#10 + 'If you believe that this is an issue, please contact the support.',
+      'Aero disabled', MB_OK + MB_ICONWARNING);
+    Application.Terminate();
+    exit;
+  end;
+
   Progman := FindWindow('Progman', nil);
   SendMessageTimeout(Progman, $052C, 0, 0, SMTO_NORMAL, 1000, Res);
   EnumWindows(@EnumWindowsProc, 0);
+  if ((Win7Info.IsWin7) and (Win7Info.IsAeroOn)) then
+  begin
+    ShowWindow(WorkerW, SW_HIDE);
+    WorkerW := Progman;
+  end;
 
   libvlc_dynamic_dll_init_with_path(
     UTF8Encode(IncludeTrailingBackslash(ExtractFilePath(Application.ExeName)) +
@@ -238,6 +271,7 @@ var
   SL, Split: TStringList;
   Val: string;
 begin
+  // InitializeConfig() returns false on first run.
   if (not InitializeConfig()) then
   begin
     TrayIcon1.BalloonTitle := 'VideoDesktop';

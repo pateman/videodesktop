@@ -1,6 +1,6 @@
 unit ufunctions;
 
-{$mode objfpc}{$H+}
+{$mode delphi}{$H+}
 
 interface
 
@@ -18,7 +18,9 @@ procedure SplitString(const Delimiter: char; const Str: string;
 function GetMonitorName(const Hnd: HMONITOR): string;
 function GetCurrentUser(): string;
 function InitializeConfig(): boolean;
-function RECTToString(const R: TRect): String;
+function RECTToString(const R: TRect): string;
+function IsWin7(): boolean;
+function IsAeroEnabled(): boolean;
 
 var
   Config: TIniFile;
@@ -165,9 +167,39 @@ begin
   end;
 end;
 
-function RECTToString(const R: TRect): String;
+function RECTToString(const R: TRect): string;
 begin
   Result := Format('(%d, %d) (%d, %d)', [R.Left, R.Top, R.Right, R.Bottom]);
+end;
+
+function IsWin7(): boolean;
+begin
+  Result := ((Win32MajorVersion = 6) and (Win32MinorVersion = 1));
+end;
+
+function IsAeroEnabled: boolean;
+type
+  TDwmIsCompositionEnabledFunc = function(out pfEnabled: BOOL): HRESULT; stdcall;
+var
+  IsEnabled: BOOL;
+  ModuleHandle: HMODULE;
+  DwmIsCompositionEnabledFunc: TDwmIsCompositionEnabledFunc;
+begin
+  Result := False;
+  if Win32MajorVersion >= 6 then
+  begin
+    ModuleHandle := LoadLibrary('dwmapi.dll');
+    if ModuleHandle <> 0 then
+      try
+        @DwmIsCompositionEnabledFunc := GetProcAddress(ModuleHandle, 'DwmIsCompositionEnabled');
+        if Assigned(DwmIsCompositionEnabledFunc) then
+          if DwmIsCompositionEnabledFunc(IsEnabled) = S_OK then
+            Result := IsEnabled;
+      finally
+        if (ModuleHandle <> 0) then
+          FreeLibrary(ModuleHandle);
+      end;
+  end;
 end;
 
 end.
