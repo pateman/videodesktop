@@ -6,7 +6,7 @@ interface
 
 uses
   Windows, SysUtils, Forms, Controls, ExtCtrls, Dialogs, StdCtrls,
-  PasLibVlcUnit, Classes, Graphics, Menus, IniFiles, regexpr, uwinapi;
+  PasLibVlcUnit, Classes, Graphics, Menus, ComCtrls, IniFiles, regexpr, uwinapi;
 
 const
   PANEL_WIDTH = 220;
@@ -37,13 +37,15 @@ type
 
   { TForm1 }
   TForm1 = class(TForm)
+    ApplicationProperties1: TApplicationProperties;
     ImageList1: TImageList;
     MainMenu1: TMainMenu;
     MenuItem1: TMenuItem;
     MenuItem2: TMenuItem;
     OpenDialog1: TOpenDialog;
-    ScrollBox1: TScrollBox;
+    PageControl1: TPageControl;
     TrayIcon1: TTrayIcon;
+    procedure ApplicationProperties1Minimize(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure MenuItem1Click(Sender: TObject);
@@ -58,7 +60,7 @@ type
     procedure Initialize();
     procedure PanelButtonSetClick(Sender: TObject);
     procedure PanelButtonClearClick(Sender: TObject);
-    function CreatePanelForMonitor(const MonitorIdx: integer): TPanel;
+    function CreatePanelForMonitor(const MonitorIdx: integer): TTabSheet;
 
     procedure SetVideoForMonitor(const MonitorIdx: integer; const FileName: string);
     procedure StoreSettingForMonitor(const MonitorIdx: integer; const FileName: string);
@@ -172,7 +174,8 @@ begin
   begin
     Application.MessageBox(
       'VideoDesktop requires Aero. Please enable Aero and run VideoDesktop again.' +
-      #13#10 + #13#10 + 'If you believe that this is an issue, please contact the support.',
+      #13#10 + #13#10 +
+      'If you believe that this is an issue, please contact the support.',
       'Aero disabled', MB_OK + MB_ICONWARNING);
     Application.Terminate();
     exit;
@@ -210,6 +213,15 @@ begin
   CurrentUser := GetCurrentUser();
 
   Self.Initialize();
+end;
+
+procedure TForm1.ApplicationProperties1Minimize(Sender: TObject);
+begin
+  // Because a minimized window can't be hidden or removed from the taskbar.
+  Self.WindowState := wsNormal;
+  Self.Hide();
+  Self.ShowInTaskBar := stNever;
+  TrayIcon1.Show();
 end;
 
 procedure TForm1.FormDestroy(Sender: TObject);
@@ -261,8 +273,8 @@ end;
 
 procedure TForm1.TrayIcon1DblClick(Sender: TObject);
 begin
-  Application.Restore();
   Self.Show();
+  Self.ShowInTaskBar := stAlways;
 end;
 
 procedure TForm1.Initialize;
@@ -283,7 +295,7 @@ begin
   begin
     WndHandles[I].VideoPathComponent :=
       CreatePanelForMonitor(Screen.Monitors[I].MonitorNum);
-    WndHandles[I].VideoPathComponent.Parent := ScrollBox1;
+    WndHandles[I].VideoPathComponent.Parent := PageControl1;
     WndHandles[I].VideoPathComponent.Left := I * WndHandles[I].VideoPathComponent.Width;
   end;
 
@@ -344,17 +356,18 @@ begin
   end;
 end;
 
-function TForm1.CreatePanelForMonitor(const MonitorIdx: integer): TPanel;
+function TForm1.CreatePanelForMonitor(const MonitorIdx: integer): TTabSheet;
 var
-  Container: TPanel;
+  Container: TTabSheet;
   IconMonitor, IconThumb: TImage;
   MonitorName: TLabel;
   Bmp: TBitmap;
   ButtonSet, ButtonClear: TButton;
 begin
-  Container := TPanel.Create(Self);
+  Container := TTabSheet.Create(Self);
   Container.Width := PANEL_WIDTH;
   Container.Height := 192;
+  Container.Caption := Format('Monitor %d', [MonitorIdx + 1]);
 
   IconMonitor := TImage.Create(Container);
   IconMonitor.Parent := Container;
