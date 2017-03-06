@@ -196,7 +196,12 @@ begin
 
   if (libvlc_dynamic_dll_error <> '') then
   begin
-    MessageDlg(libvlc_dynamic_dll_error, mtError, [mbOK], 0);
+    Application.MessageBox(
+      'Unable to load libVLC. Please reinstall VideoDesktop and try again.' +
+      #13#10 + #13#10 +
+      'If you believe that this is an issue, please contact the support.',
+      'Missing libVLC', MB_OK + MB_ICONSTOP);
+    Application.Terminate();
     exit;
   end;
 
@@ -242,7 +247,8 @@ begin
   end;
 
   SetLength(WndHandles, 0);
-  libvlc_release(p_li);
+  if (p_li <> nil) then
+    libvlc_release(p_li);
   Config.Free();
 
   // Repaint the desktop.

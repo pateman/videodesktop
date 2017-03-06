@@ -7,14 +7,13 @@ object Form1: TForm1
   BorderIcons = [biSystemMenu, biMinimize]
   BorderStyle = bsSingle
   Caption = 'VideoDesktop v.1.0'
-  ClientHeight = 254
+  ClientHeight = 234
   ClientWidth = 273
   Menu = MainMenu1
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   Position = poScreenCenter
   LCLVersion = '1.6.2.0'
-  Visible = False
   object PageControl1: TPageControl
     Left = 32
     Height = 216
